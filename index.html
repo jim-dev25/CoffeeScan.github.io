@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Win A Free Coffee</title>
+    <title>Coffee Promotion</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fingerprintjs@2.1.4/dist/fingerprint2.min.js"></script>
     <style>
-        /* Styles remain unchanged */
         :root {
             --coffee-dark: #FF5A3D;
             --coffee-medium: #FF7A5D;
@@ -80,6 +81,11 @@
             animation: fadeIn 0.5s;
         }
         
+        .loading-message {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
         .code-display {
             font-size: 2rem;
             letter-spacing: 3px;
@@ -149,6 +155,11 @@
         
         button:hover {
             background-color: var(--coffee-medium);
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
         }
         
         footer {
@@ -264,6 +275,21 @@
             font-weight: bold;
         }
         
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: var(--coffee-dark);
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -286,7 +312,7 @@
 </head>
 <body>
     <header>
-        <h1>Win A Free Coffee!</h1>
+        <h1>Coffee Rewards</h1>
         <p>One coffee purchase = one daily chance to win!</p>
     </header>
     
@@ -297,6 +323,11 @@
                 <p>Tap the button below to see if you've won a free coffee.</p>
                 <div class="emoji">☕</div>
                 <button id="checkButton">Check My Luck</button>
+            </div>
+            
+            <div class="loading-message" id="loadingMessage">
+                <p>Checking your luck...</p>
+                <div class="spinner"></div>
             </div>
             
             <div class="win-message" id="winMessage">
@@ -385,65 +416,175 @@
     </footer>
 
     <script>
-        // Initialize localStorage if not already set
-        function initializeStorage() {
-            if (!localStorage.getItem('coffeePromo')) {
-                localStorage.setItem('coffeePromo', JSON.stringify({
-                    totalScans: 0,
-                    totalWinners: 0,
-                    maxWinners: 50,
-                    nextCodeNumber: 201, // Start at 201
-                    winningCodes: []
-                }));
+        // Initialize Supabase client
+        const supabaseUrl = 'https://yjnxfqnvbxnxfqnvbxnx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqbnhmcW52YnhueGZxbnZieG54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODIzNDI0MDAsImV4cCI6MTk5NzkxODQwMH0.REPLACE_WITH_YOUR_KEY';
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+        
+        // User identification
+        let userId = null;
+        
+        // Get or generate a unique user ID
+        async function getUserId() {
+            // Check if we already have a user ID in local storage
+            const storedUserId = localStorage.getItem('coffeePromoUserId');
+            if (storedUserId) {
+                return storedUserId;
+            }
+            
+            // Generate a fingerprint-based ID
+            const components = await Fingerprint2.getPromise();
+            const values = components.map(component => component.value);
+            const fingerprint = Fingerprint2.x64hash128(values.join(''), 31);
+            
+            // Store the ID for future use
+            localStorage.setItem('coffeePromoUserId', fingerprint);
+            return fingerprint;
+        }
+        
+        // Get promotion configuration
+        async function getPromotionConfig() {
+            const { data, error } = await supabase
+                .from('promotion_config')
+                .select('*')
+                .order('id', { ascending: false })
+                .limit(1)
+                .single();
+                
+            if (error) {
+                console.error('Error fetching promotion config:', error);
+                return null;
+            }
+            
+            return data;
+        }
+        
+        // Check if user has already played today
+        async function hasPlayedToday() {
+            const id = await getUserId();
+            
+            const { data, error } = await supabase
+                .from('user_participation')
+                .select('last_played_date')
+                .eq('user_id', id)
+                .single();
+                
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    // No record found, user hasn't played
+                    return false;
+                }
+                console.error('Error checking if user played today:', error);
+                return false;
+            }
+            
+            // Check if the last played date is today
+            const lastPlayed = new Date(data.last_played_date);
+            const today = new Date();
+            
+            return lastPlayed.toDateString() === today.toDateString();
+        }
+        
+        // Update last played date
+        async function updateLastPlayedDate() {
+            const id = await getUserId();
+            
+            // Check if user exists in the participation table
+            const { data: existingUser, error: checkError } = await supabase
+                .from('user_participation')
+                .select('id')
+                .eq('user_id', id);
+                
+            if (checkError) {
+                console.error('Error checking user participation:', checkError);
+                return false;
+            }
+            
+            if (existingUser && existingUser.length > 0) {
+                // Update existing record
+                const { error: updateError } = await supabase
+                    .from('user_participation')
+                    .update({ last_played_date: new Date().toISOString() })
+                    .eq('user_id', id);
+                    
+                if (updateError) {
+                    console.error('Error updating last played date:', updateError);
+                    return false;
+                }
             } else {
-                // Check if we need to add the nextCodeNumber field to existing data
-                const data = JSON.parse(localStorage.getItem('coffeePromo'));
-                if (data.nextCodeNumber === undefined) {
-                    data.nextCodeNumber = 201;
-                    localStorage.setItem('coffeePromo', JSON.stringify(data));
+                // Insert new record
+                const { error: insertError } = await supabase
+                    .from('user_participation')
+                    .insert({ user_id: id, last_played_date: new Date().toISOString() });
+                    
+                if (insertError) {
+                    console.error('Error inserting user participation:', insertError);
+                    return false;
                 }
             }
             
-            // Initialize user data if not already set
-            if (!localStorage.getItem('coffeePromoUser')) {
-                localStorage.setItem('coffeePromoUser', JSON.stringify({
-                    lastPlayedDate: null
-                }));
+            return true;
+        }
+        
+        // Increment total scans
+        async function incrementTotalScans() {
+            // Get current scan statistics
+            const { data: scanStats, error: fetchError } = await supabase
+                .from('scan_statistics')
+                .select('id, total_scans')
+                .order('id', { ascending: false })
+                .limit(1)
+                .single();
+                
+            if (fetchError) {
+                console.error('Error fetching scan statistics:', fetchError);
+                return false;
             }
-        }
-
-        // Get promotion data from localStorage
-        function getPromoData() {
-            return JSON.parse(localStorage.getItem('coffeePromo'));
-        }
-
-        // Save promotion data to localStorage
-        function savePromoData(data) {
-            localStorage.setItem('coffeePromo', JSON.stringify(data));
+            
+            // Update scan count
+            const { error: updateError } = await supabase
+                .from('scan_statistics')
+                .update({ 
+                    total_scans: scanStats.total_scans + 1,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', scanStats.id);
+                
+            if (updateError) {
+                console.error('Error updating scan statistics:', updateError);
+                return false;
+            }
+            
+            return true;
         }
         
-        // Get user data from localStorage
-        function getUserData() {
-            return JSON.parse(localStorage.getItem('coffeePromoUser'));
-        }
-        
-        // Save user data to localStorage
-        function saveUserData(data) {
-            localStorage.setItem('coffeePromoUser', JSON.stringify(data));
-        }
-
         // Generate the next sequential code
-        function generateNextCode() {
-            const data = getPromoData();
+        async function generateNextCode() {
+            // Get current configuration
+            const config = await getPromotionConfig();
+            if (!config) return null;
             
             // Check if we've reached the maximum number of winners
-            if (data.nextCodeNumber > 250) {
+            if (config.next_code_number > config.end_code_number) {
                 return null; // No more codes available
             }
             
-            const code = data.nextCodeNumber.toString();
-            data.nextCodeNumber++;
-            savePromoData(data);
+            // Get the code
+            const code = config.next_code_number.toString();
+            
+            // Update the next code number
+            const { error: updateError } = await supabase
+                .from('promotion_config')
+                .update({ 
+                    next_code_number: config.next_code_number + 1,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', config.id);
+                
+            if (updateError) {
+                console.error('Error updating next code number:', updateError);
+                return null;
+            }
             
             return code;
         }
@@ -457,100 +598,117 @@
             const endOfWeek = new Date(now);
             endOfWeek.setDate(now.getDate() + daysUntilSunday);
             
-            // Format the date
+            return endOfWeek;
+        }
+        
+        // Format date for display
+        function formatDateForDisplay(date) {
             const options = { weekday: 'long', month: 'long', day: 'numeric' };
-            return endOfWeek.toLocaleDateString('en-US', options);
+            return date.toLocaleDateString('en-US', options);
         }
         
-        // Check if user has already played today
-        function hasPlayedToday() {
-            const userData = getUserData();
-            
-            if (!userData.lastPlayedDate) {
-                return false;
-            }
-            
-            const lastPlayed = new Date(userData.lastPlayedDate);
-            const today = new Date();
-            
-            return lastPlayed.toDateString() === today.toDateString();
-        }
-        
-        // Update last played date
-        function updateLastPlayedDate() {
-            const userData = getUserData();
-            userData.lastPlayedDate = new Date().toISOString();
-            saveUserData(userData);
-        }
-
-        // Check if user wins (30% chance)
-        function checkWin() {
-            const data = getPromoData();
+        // Check if user wins
+        async function checkWin() {
+            // Get user ID
+            userId = await getUserId();
             
             // Increment total scans
-            data.totalScans++;
+            await incrementTotalScans();
             
             // Update last played date
-            updateLastPlayedDate();
+            await updateLastPlayedDate();
+            
+            // Get promotion config
+            const config = await getPromotionConfig();
+            if (!config) return false;
             
             // Check if we've reached the maximum number of winners
-            if (data.totalWinners >= data.maxWinners) {
-                savePromoData(data);
+            const { data: winningCodesCount, error: countError } = await supabase
+                .from('winning_codes')
+                .select('id', { count: 'exact', head: true });
+                
+            if (countError) {
+                console.error('Error counting winning codes:', countError);
                 return false;
             }
             
-            // 30% chance of winning
-            const isWinner = Math.random() < 0.3;
+            if (winningCodesCount.length >= config.max_winners) {
+                return false;
+            }
+            
+            // Determine if user wins (based on probability)
+            const isWinner = Math.random() < config.win_probability;
             
             if (isWinner) {
-                const code = generateNextCode();
+                // Generate a code
+                const code = await generateNextCode();
                 
                 // Double-check we got a valid code
                 if (code === null) {
-                    savePromoData(data);
                     return false;
                 }
                 
-                data.totalWinners++;
-                data.winningCodes.push({
-                    code: code,
-                    redeemed: false,
-                    timestamp: new Date().toISOString(),
-                    expiryDate: getEndOfWeekDate()
-                });
+                // Calculate expiry date
+                const expiryDate = getEndOfWeekDate();
                 
-                savePromoData(data);
-                return code;
-            }
-            
-            savePromoData(data);
-            return false;
-        }
-
-        // Mark a code as redeemed
-        function redeemCode(code) {
-            const data = getPromoData();
-            const codeIndex = data.winningCodes.findIndex(item => item.code === code);
-            
-            if (codeIndex !== -1 && !data.winningCodes[codeIndex].redeemed) {
-                data.winningCodes[codeIndex].redeemed = true;
-                data.winningCodes[codeIndex].redeemedAt = new Date().toISOString();
-                savePromoData(data);
-                return true;
+                // Store the winning code
+                const { error: insertError } = await supabase
+                    .from('winning_codes')
+                    .insert({
+                        code: code,
+                        redeemed: false,
+                        timestamp: new Date().toISOString(),
+                        expiry_date: expiryDate.toISOString(),
+                        user_id: userId
+                    });
+                    
+                if (insertError) {
+                    console.error('Error storing winning code:', insertError);
+                    return false;
+                }
+                
+                return {
+                    code: code,
+                    expiryDate: formatDateForDisplay(expiryDate)
+                };
             }
             
             return false;
         }
         
-        // Format time until next play
-        function formatTimeUntilNextPlay() {
-            const userData = getUserData();
+        // Mark a code as redeemed
+        async function redeemCode(code) {
+            const { error } = await supabase
+                .from('winning_codes')
+                .update({
+                    redeemed: true,
+                    redeemed_at: new Date().toISOString()
+                })
+                .eq('code', code);
+                
+            if (error) {
+                console.error('Error redeeming code:', error);
+                return false;
+            }
             
-            if (!userData.lastPlayedDate) {
+            return true;
+        }
+        
+        // Format time until next play
+        async function formatTimeUntilNextPlay() {
+            const id = await getUserId();
+            
+            const { data, error } = await supabase
+                .from('user_participation')
+                .select('last_played_date')
+                .eq('user_id', id)
+                .single();
+                
+            if (error) {
                 return "You can play now!";
             }
             
-            const lastPlayed = new Date(userData.lastPlayedDate);
+            const lastPlayed = new Date(data.last_played_date);
             const tomorrow = new Date(lastPlayed);
             tomorrow.setDate(tomorrow.getDate() + 1);
             tomorrow.setHours(0, 0, 0, 0);
@@ -568,42 +726,150 @@
             return `Your next chance will be available in ${hours} hours and ${minutes} minutes.`;
         }
         
-        // Get remaining coffees count
-        function getRemainingCoffees() {
-            const data = getPromoData();
-            return data.maxWinners - data.totalWinners;
+        // Get admin statistics
+        async function getAdminStats() {
+            // Get total scans
+            const { data: scanStats, error: scanError } = await supabase
+                .from('scan_statistics')
+                .select('total_scans')
+                .order('id', { ascending: false })
+                .limit(1)
+                .single();
+                
+            if (scanError) {
+                console.error('Error fetching scan statistics:', scanError);
+                return null;
+            }
+            
+            // Get winning codes
+            const { data: winningCodes, error: codesError } = await supabase
+                .from('winning_codes')
+                .select('*')
+                .order('code', { ascending: true });
+                
+            if (codesError) {
+                console.error('Error fetching winning codes:', codesError);
+                return null;
+            }
+            
+            // Get promotion config
+            const config = await getPromotionConfig();
+            if (!config) return null;
+            
+            // Calculate statistics
+            const totalWinners = winningCodes.length;
+            const totalRedeemed = winningCodes.filter(code => code.redeemed).length;
+            const remainingCoffees = config.max_winners - totalWinners;
+            
+            return {
+                totalScans: scanStats.total_scans,
+                totalWinners,
+                totalRedeemed,
+                remainingCoffees,
+                nextCodeNumber: config.next_code_number,
+                winningCodes
+            };
         }
         
-        // Reset promotion data
-        function resetPromotion() {
-            if (confirm("Are you sure you want to reset the promotion? This will clear all data including winning codes.")) {
-                localStorage.setItem('coffeePromo', JSON.stringify({
-                    totalScans: 0,
-                    totalWinners: 0,
-                    maxWinners: 50,
-                    nextCodeNumber: 201,
-                    winningCodes: []
-                }));
-                
-                alert("Promotion has been reset.");
-                updateAdminDashboard();
+        // Reset promotion
+        async function resetPromotion() {
+            if (!confirm("Are you sure you want to reset the promotion? This will clear all data including winning codes.")) {
+                return false;
             }
+            
+            // Reset promotion config
+            const { data: config, error: configError } = await supabase
+                .from('promotion_config')
+                .select('id')
+                .order('id', { ascending: false })
+                .limit(1)
+                .single();
+                
+            if (configError) {
+                console.error('Error fetching promotion config:', configError);
+                return false;
+            }
+            
+            const { error: updateConfigError } = await supabase
+                .from('promotion_config')
+                .update({
+                    next_code_number: 201,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', config.id);
+                
+            if (updateConfigError) {
+                console.error('Error resetting promotion config:', updateConfigError);
+                return false;
+            }
+            
+            // Reset scan statistics
+            const { data: scanStats, error: scanError } = await supabase
+                .from('scan_statistics')
+                .select('id')
+                .order('id', { ascending: false })
+                .limit(1)
+                .single();
+                
+            if (scanError) {
+                console.error('Error fetching scan statistics:', scanError);
+                return false;
+            }
+            
+            const { error: updateScanError } = await supabase
+                .from('scan_statistics')
+                .update({
+                    total_scans: 0,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', scanStats.id);
+                
+            if (updateScanError) {
+                console.error('Error resetting scan statistics:', updateScanError);
+                return false;
+            }
+            
+            // Delete all winning codes
+            const { error: deleteCodesError } = await supabase
+                .from('winning_codes')
+                .delete()
+                .neq('id', 0); // Delete all records
+                
+            if (deleteCodesError) {
+                console.error('Error deleting winning codes:', deleteCodesError);
+                return false;
+            }
+            
+            // Delete all user participation records
+            const { error: deleteParticipationError } = await supabase
+                .from('user_participation')
+                .delete()
+                .neq('id', 0); // Delete all records
+                
+            if (deleteParticipationError) {
+                console.error('Error deleting user participation:', deleteParticipationError);
+                return false;
+            }
+            
+            alert("Promotion has been reset successfully.");
+            return true;
         }
-
+        
         // Update admin dashboard
-        function updateAdminDashboard() {
-            const data = getPromoData();
+        async function updateAdminDashboard() {
+            const stats = await getAdminStats();
+            if (!stats) {
+                alert("Error fetching admin statistics. Please try again.");
+                return;
+            }
             
-            document.getElementById('totalScans').textContent = data.totalScans;
-            document.getElementById('totalWinners').textContent = data.totalWinners;
-            
-            const redeemedCount = data.winningCodes.filter(item => item.redeemed).length;
-            document.getElementById('totalRedeemed').textContent = redeemedCount;
+            document.getElementById('totalScans').textContent = stats.totalScans;
+            document.getElementById('totalWinners').textContent = stats.totalWinners;
+            document.getElementById('totalRedeemed').textContent = stats.totalRedeemed;
             
             // Update remaining coffees in admin panel
-            const remaining = data.maxWinners - data.totalWinners;
-            const remainingText = remaining > 0 
-                ? `${remaining} free coffees remaining (next code: ${data.nextCodeNumber})` 
+            const remainingText = stats.remainingCoffees > 0 
+                ? `${stats.remainingCoffees} free coffees remaining (next code: ${stats.nextCodeNumber})` 
                 : "All free coffees have been claimed!";
                 
             document.getElementById('adminRemainingCoffees').textContent = remainingText;
@@ -611,22 +877,19 @@
             const codesList = document.getElementById('codesList');
             codesList.innerHTML = '';
             
-            if (data.winningCodes.length === 0) {
+            if (stats.winningCodes.length === 0) {
                 codesList.innerHTML = '<p style="padding: 10px; text-align: center;">No winning codes yet</p>';
                 return;
             }
             
-            // Sort codes numerically
-            const sortedCodes = [...data.winningCodes].sort((a, b) => {
-                return parseInt(a.code) - parseInt(b.code);
-            });
-            
-            sortedCodes.forEach(item => {
+            stats.winningCodes.forEach(item => {
                 const codeItem = document.createElement('div');
                 codeItem.className = 'code-item';
                 
+                const expiryDate = new Date(item.expiry_date);
+                
                 const codeText = document.createElement('span');
-                codeText.textContent = `${item.code} (Expires: ${item.expiryDate || 'End of week'})`;
+                codeText.textContent = `${item.code} (Expires: ${formatDateForDisplay(expiryDate)})`;
                 if (item.redeemed) {
                     codeText.classList.add('redeemed');
                 }
@@ -647,8 +910,8 @@
                     redeemButton.style.padding = '5px 10px';
                     redeemButton.style.marginLeft = '10px';
                     
-                    redeemButton.addEventListener('click', function() {
-                        if (redeemCode(item.code)) {
+                    redeemButton.addEventListener('click', async function() {
+                        if (await redeemCode(item.code)) {
                             updateAdminDashboard();
                         }
                     });
@@ -663,11 +926,12 @@
         }
 
         // Initialize the app
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeStorage();
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Get user ID
+            userId = await getUserId();
             
             // Set the expiry date
-            document.getElementById('expiryDate').textContent = getEndOfWeekDate();
+            document.getElementById('expiryDate').textContent = formatDateForDisplay(getEndOfWeekDate());
             
             const checkButton = document.getElementById('checkButton');
             const adminLink = document.getElementById('adminLink');
@@ -676,30 +940,44 @@
             const resetButton = document.getElementById('resetButton');
             
             // Update next play time if already played today
-            if (hasPlayedToday()) {
-                document.getElementById('nextPlayTime').textContent = formatTimeUntilNextPlay();
+            if (await hasPlayedToday()) {
+                document.getElementById('nextPlayTime').textContent = await formatTimeUntilNextPlay();
             }
             
             // Check button click
-            checkButton.addEventListener('click', function() {
+            checkButton.addEventListener('click', async function() {
+                // Disable the button to prevent multiple clicks
+                checkButton.disabled = true;
+                
+                // Show loading message
                 document.getElementById('initial-message').style.display = 'none';
+                document.getElementById('loadingMessage').style.display = 'block';
                 
                 // Check if user has already played today
-                if (hasPlayedToday()) {
+                if (await hasPlayedToday()) {
+                    document.getElementById('loadingMessage').style.display = 'none';
                     document.getElementById('alreadyPlayedMessage').style.display = 'block';
-                    document.getElementById('nextPlayTime').textContent = formatTimeUntilNextPlay();
+                    document.getElementById('nextPlayTime').textContent = await formatTimeUntilNextPlay();
+                    checkButton.disabled = false;
                     return;
                 }
                 
-                const winCode = checkWin();
+                // Check if user wins
+                const result = await checkWin();
                 
-                if (winCode) {
-                    document.getElementById('winCode').textContent = winCode;
-                    document.getElementById('expiryDate').textContent = getEndOfWeekDate();
+                // Hide loading message
+                document.getElementById('loadingMessage').style.display = 'none';
+                
+                if (result) {
+                    document.getElementById('winCode').textContent = result.code;
+                    document.getElementById('expiryDate').textContent = result.expiryDate;
                     document.getElementById('winMessage').style.display = 'block';
                 } else {
                     document.getElementById('loseMessage').style.display = 'block';
                 }
+                
+                // Re-enable the button
+                checkButton.disabled = false;
             });
             
             // Admin link click
@@ -724,10 +1002,14 @@
             });
             
             // Reset button click
-            resetButton.addEventListener('click', resetPromotion);
+            resetButton.addEventListener('click', async function() {
+                if (await resetPromotion()) {
+                    updateAdminDashboard();
+                }
+            });
             
             // Back button click
-            backButton.addEventListener('click', function() {
+            backButton.addEventListener('click', async function() {
                 document.getElementById('adminPanel').style.display = 'none';
                 document.getElementById('resultContainer').style.display = 'block';
                 document.getElementById('adminLogin').style.display = 'block';
@@ -738,16 +1020,20 @@
                 document.getElementById('winMessage').style.display = 'none';
                 document.getElementById('loseMessage').style.display = 'none';
                 document.getElementById('alreadyPlayedMessage').style.display = 'none';
+                document.getElementById('loadingMessage').style.display = 'none';
                 
                 // Show appropriate message based on whether user has played today
-                if (hasPlayedToday()) {
+                if (await hasPlayedToday()) {
                     document.getElementById('alreadyPlayedMessage').style.display = 'block';
-                    document.getElementById('nextPlayTime').textContent = formatTimeUntilNextPlay();
+                    document.getElementById('nextPlayTime').textContent = await formatTimeUntilNextPlay();
                 } else {
                     document.getElementById('initial-message').style.display = 'block';
                 }
             });
         });
     </script>
+</body>
+</html>
+
 </body>
 </html>
