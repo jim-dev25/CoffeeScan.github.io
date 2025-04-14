@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Win A Free Coffee</title>
+    <style>
+        /* Styles remain unchanged */
+        :root {
+            --coffee-dark: #FF5A3D;
+            --coffee-medium: #FF7A5D;
+            --coffee-light: #FF8C6D;
+            --cream: #FFAC9D;
+            --accent: #FF5A3D;
+            --card-bg: #FFE4DF;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--cream);
+            color: var(--coffee-dark);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+        }
+        
+        header {
+            background-color: var(--card-bg);
+            color: var(--coffee-dark);
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .result-container {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .result-container h2 {
+            color: var(--coffee-dark);
+        }
+        
+        .win-message {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .lose-message {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .already-played-message {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .code-display {
+            font-size: 2rem;
+            letter-spacing: 3px;
+            font-weight: bold;
+            color: var(--coffee-dark);
+            margin: 20px 0;
+            padding: 10px;
+            background-color: var(--cream);
+            border-radius: 5px;
+            border: 2px dashed var(--coffee-dark);
+        }
+        
+        .emoji {
+            font-size: 3rem;
+            margin: 10px 0;
+        }
+        
+        .next-day-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: var(--cream);
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .expiry-info {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--coffee-dark);
+        }
+        
+        .instructions {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: var(--cream);
+            border-radius: 5px;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+        
+        .instructions ul {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+        
+        .instructions li {
+            margin-bottom: 5px;
+        }
+        
+        .one-time-notice {
+            font-weight: bold;
+            margin-top: 10px;
+            color: var(--coffee-dark);
+        }
+        
+        button {
+            background-color: var(--coffee-dark);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: var(--coffee-medium);
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            background-color: var(--card-bg);
+            color: var(--coffee-dark);
+            font-size: 0.8rem;
+            margin-top: auto;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .admin-link {
+            color: var(--coffee-dark);
+            opacity: 0.7;
+            text-decoration: none;
+            font-size: 0.7rem;
+        }
+        
+        /* Admin Panel Styles */
+        .admin-panel {
+            display: none;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-login {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background-color: var(--cream);
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--coffee-dark);
+        }
+        
+        .codes-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+        }
+        
+        .code-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .code-item:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .redeemed {
+            color: #999;
+            text-decoration: line-through;
+        }
+        
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+        
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-redeemed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        input[type="password"] {
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .back-button {
+            background-color: #6c757d;
+            margin-top: 20px;
+        }
+        
+        .remaining-coffees {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: var(--coffee-dark);
+            font-weight: bold;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .admin-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Win A Free Coffee!</h1>
+        <p>One coffee purchase = one daily chance to win!</p>
+    </header>
+    
+    <div class="container">
+        <div class="result-container" id="resultContainer">
+            <div id="initial-message">
+                <p>Thanks for purchasing a coffee today!</p>
+                <p>Tap the button below to see if you've won a free coffee.</p>
+                <div class="emoji">☕</div>
+                <button id="checkButton">Check My Luck</button>
+            </div>
+            
+            <div class="win-message" id="winMessage">
+                <h2>Congratulations! 🎉</h2>
+                <p>You've won a free coffee!</p>
+                <div class="emoji">🥳☕</div>
+                <p>Show this code to the barista:</p>
+                <div class="code-display" id="winCode">---</div>
+                <p class="one-time-notice">This is a one-time use code.</p>
+                <p class="expiry-info">Valid until: <span id="expiryDate">Sunday, April 16</span></p>
+                
+                <div class="instructions">
+                    <strong>How to claim your free coffee:</strong>
+                    <ul>
+                        <li>Take a screenshot of this page</li>
+                        <li>Show the screenshot to the barista on your next visit</li>
+                        <li>Claim before the expiry date</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="lose-message" id="loseMessage">
+                <h2>Not a winner this time</h2>
+                <p>Thanks for participating!</p>
+                <div class="emoji">😊</div>
+                <p>Better luck next time!</p>
+                <div class="next-day-info">
+                    <p>Purchase another coffee tomorrow for another chance to win!</p>
+                </div>
+            </div>
+            
+            <div class="already-played-message" id="alreadyPlayedMessage">
+                <h2>You've already played today</h2>
+                <p>Thanks for your purchase!</p>
+                <div class="emoji">⏰</div>
+                <p>You can try again tomorrow with your next coffee purchase.</p>
+                <div class="next-day-info">
+                    <p id="nextPlayTime">Your next chance will be available tomorrow.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="admin-panel" id="adminPanel">
+            <div class="admin-login" id="adminLogin">
+                <h2>Admin Login</h2>
+                <div style="margin: 20px 0;">
+                    <input type="password" id="adminPassword" placeholder="Enter password">
+                    <button id="loginButton">Login</button>
+                </div>
+            </div>
+            
+            <div id="adminDashboard" style="display: none;">
+                <h2>Admin Dashboard</h2>
+                
+                <div class="admin-stats">
+                    <div class="stat-box">
+                        <p>Total Scans</p>
+                        <div class="stat-number" id="totalScans">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <p>Total Winners</p>
+                        <div class="stat-number" id="totalWinners">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <p>Total Redeemed</p>
+                        <div class="stat-number" id="totalRedeemed">0</div>
+                    </div>
+                </div>
+                
+                <div class="remaining-coffees" id="adminRemainingCoffees"></div>
+                
+                <h3>Winning Codes</h3>
+                <div class="codes-list" id="codesList">
+                    <!-- Codes will be listed here -->
+                </div>
+                
+                <button class="back-button" id="backButton">Back to Promotion</button>
+                <button id="resetButton" style="background-color: #dc3545; margin-top: 20px; margin-left: 10px;">Reset Promotion</button>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2025 Coffee Shop Promotion</p>
+        <a href="#" class="admin-link" id="adminLink">Admin</a>
+    </footer>
+
+    <script>
+        // Initialize localStorage if not already set
+        function initializeStorage() {
+            if (!localStorage.getItem('coffeePromo')) {
+                localStorage.setItem('coffeePromo', JSON.stringify({
+                    totalScans: 0,
+                    totalWinners: 0,
+                    maxWinners: 50,
+                    nextCodeNumber: 201, // Start at 201
+                    winningCodes: []
+                }));
+            } else {
+                // Check if we need to add the nextCodeNumber field to existing data
+                const data = JSON.parse(localStorage.getItem('coffeePromo'));
+                if (data.nextCodeNumber === undefined) {
+                    data.nextCodeNumber = 201;
+                    localStorage.setItem('coffeePromo', JSON.stringify(data));
+                }
+            }
+            
+            // Initialize user data if not already set
+            if (!localStorage.getItem('coffeePromoUser')) {
+                localStorage.setItem('coffeePromoUser', JSON.stringify({
+                    lastPlayedDate: null
+                }));
+            }
+        }
+
+        // Get promotion data from localStorage
+        function getPromoData() {
+            return JSON.parse(localStorage.getItem('coffeePromo'));
+        }
+
+        // Save promotion data to localStorage
+        function savePromoData(data) {
+            localStorage.setItem('coffeePromo', JSON.stringify(data));
+        }
+        
+        // Get user data from localStorage
+        function getUserData() {
+            return JSON.parse(localStorage.getItem('coffeePromoUser'));
+        }
+        
+        // Save user data to localStorage
+        function saveUserData(data) {
+            localStorage.setItem('coffeePromoUser', JSON.stringify(data));
+        }
+
+        // Generate the next sequential code
+        function generateNextCode() {
+            const data = getPromoData();
+            
+            // Check if we've reached the maximum number of winners
+            if (data.nextCodeNumber > 250) {
+                return null; // No more codes available
+            }
+            
+            const code = data.nextCodeNumber.toString();
+            data.nextCodeNumber++;
+            savePromoData(data);
+            
+            return code;
+        }
+        
+        // Calculate end of week date (Sunday)
+        function getEndOfWeekDate() {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday, etc.
+            const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek; // If today is Sunday, go to next Sunday
+            
+            const endOfWeek = new Date(now);
+            endOfWeek.setDate(now.getDate() + daysUntilSunday);
+            
+            // Format the date
+            const options = { weekday: 'long', month: 'long', day: 'numeric' };
+            return endOfWeek.toLocaleDateString('en-US', options);
+        }
+        
+        // Check if user has already played today
+        function hasPlayedToday() {
+            const userData = getUserData();
+            
+            if (!userData.lastPlayedDate) {
+                return false;
+            }
+            
+            const lastPlayed = new Date(userData.lastPlayedDate);
+            const today = new Date();
+            
+            return lastPlayed.toDateString() === today.toDateString();
+        }
+        
+        // Update last played date
+        function updateLastPlayedDate() {
+            const userData = getUserData();
+            userData.lastPlayedDate = new Date().toISOString();
+            saveUserData(userData);
+        }
+
+        // Check if user wins (30% chance)
+        function checkWin() {
+            const data = getPromoData();
+            
+            // Increment total scans
+            data.totalScans++;
+            
+            // Update last played date
+            updateLastPlayedDate();
+            
+            // Check if we've reached the maximum number of winners
+            if (data.totalWinners >= data.maxWinners) {
+                savePromoData(data);
+                return false;
+            }
+            
+            // 30% chance of winning
+            const isWinner = Math.random() < 0.3;
+            
+            if (isWinner) {
+                const code = generateNextCode();
+                
+                // Double-check we got a valid code
+                if (code === null) {
+                    savePromoData(data);
+                    return false;
+                }
+                
+                data.totalWinners++;
+                data.winningCodes.push({
+                    code: code,
+                    redeemed: false,
+                    timestamp: new Date().toISOString(),
+                    expiryDate: getEndOfWeekDate()
+                });
+                
+                savePromoData(data);
+                return code;
+            }
+            
+            savePromoData(data);
+            return false;
+        }
+
+        // Mark a code as redeemed
+        function redeemCode(code) {
+            const data = getPromoData();
+            const codeIndex = data.winningCodes.findIndex(item => item.code === code);
+            
+            if (codeIndex !== -1 && !data.winningCodes[codeIndex].redeemed) {
+                data.winningCodes[codeIndex].redeemed = true;
+                data.winningCodes[codeIndex].redeemedAt = new Date().toISOString();
+                savePromoData(data);
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // Format time until next play
+        function formatTimeUntilNextPlay() {
+            const userData = getUserData();
+            
+            if (!userData.lastPlayedDate) {
+                return "You can play now!";
+            }
+            
+            const lastPlayed = new Date(userData.lastPlayedDate);
+            const tomorrow = new Date(lastPlayed);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0);
+            
+            const now = new Date();
+            const timeUntil = tomorrow - now;
+            
+            if (timeUntil <= 0) {
+                return "You can play now!";
+            }
+            
+            const hours = Math.floor(timeUntil / (1000 * 60 * 60));
+            const minutes = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+            
+            return `Your next chance will be available in ${hours} hours and ${minutes} minutes.`;
+        }
+        
+        // Get remaining coffees count
+        function getRemainingCoffees() {
+            const data = getPromoData();
+            return data.maxWinners - data.totalWinners;
+        }
+        
+        // Reset promotion data
+        function resetPromotion() {
+            if (confirm("Are you sure you want to reset the promotion? This will clear all data including winning codes.")) {
+                localStorage.setItem('coffeePromo', JSON.stringify({
+                    totalScans: 0,
+                    totalWinners: 0,
+                    maxWinners: 50,
+                    nextCodeNumber: 201,
+                    winningCodes: []
+                }));
+                
+                alert("Promotion has been reset.");
+                updateAdminDashboard();
+            }
+        }
+
+        // Update admin dashboard
+        function updateAdminDashboard() {
+            const data = getPromoData();
+            
+            document.getElementById('totalScans').textContent = data.totalScans;
+            document.getElementById('totalWinners').textContent = data.totalWinners;
+            
+            const redeemedCount = data.winningCodes.filter(item => item.redeemed).length;
+            document.getElementById('totalRedeemed').textContent = redeemedCount;
+            
+            // Update remaining coffees in admin panel
+            const remaining = data.maxWinners - data.totalWinners;
+            const remainingText = remaining > 0 
+                ? `${remaining} free coffees remaining (next code: ${data.nextCodeNumber})` 
+                : "All free coffees have been claimed!";
+                
+            document.getElementById('adminRemainingCoffees').textContent = remainingText;
+            
+            const codesList = document.getElementById('codesList');
+            codesList.innerHTML = '';
+            
+            if (data.winningCodes.length === 0) {
+                codesList.innerHTML = '<p style="padding: 10px; text-align: center;">No winning codes yet</p>';
+                return;
+            }
+            
+            // Sort codes numerically
+            const sortedCodes = [...data.winningCodes].sort((a, b) => {
+                return parseInt(a.code) - parseInt(b.code);
+            });
+            
+            sortedCodes.forEach(item => {
+                const codeItem = document.createElement('div');
+                codeItem.className = 'code-item';
+                
+                const codeText = document.createElement('span');
+                codeText.textContent = `${item.code} (Expires: ${item.expiryDate || 'End of week'})`;
+                if (item.redeemed) {
+                    codeText.classList.add('redeemed');
+                }
+                
+                const statusBadge = document.createElement('span');
+                statusBadge.className = 'status-badge';
+                
+                if (item.redeemed) {
+                    statusBadge.textContent = 'Redeemed';
+                    statusBadge.classList.add('status-redeemed');
+                } else {
+                    statusBadge.textContent = 'Active';
+                    statusBadge.classList.add('status-active');
+                    
+                    const redeemButton = document.createElement('button');
+                    redeemButton.textContent = 'Mark Redeemed';
+                    redeemButton.style.fontSize = '0.8rem';
+                    redeemButton.style.padding = '5px 10px';
+                    redeemButton.style.marginLeft = '10px';
+                    
+                    redeemButton.addEventListener('click', function() {
+                        if (redeemCode(item.code)) {
+                            updateAdminDashboard();
+                        }
+                    });
+                    
+                    statusBadge.appendChild(redeemButton);
+                }
+                
+                codeItem.appendChild(codeText);
+                codeItem.appendChild(statusBadge);
+                codesList.appendChild(codeItem);
+            });
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeStorage();
+            
+            // Set the expiry date
+            document.getElementById('expiryDate').textContent = getEndOfWeekDate();
+            
+            const checkButton = document.getElementById('checkButton');
+            const adminLink = document.getElementById('adminLink');
+            const loginButton = document.getElementById('loginButton');
+            const backButton = document.getElementById('backButton');
+            const resetButton = document.getElementById('resetButton');
+            
+            // Update next play time if already played today
+            if (hasPlayedToday()) {
+                document.getElementById('nextPlayTime').textContent = formatTimeUntilNextPlay();
+            }
+            
+            // Check button click
+            checkButton.addEventListener('click', function() {
+                document.getElementById('initial-message').style.display = 'none';
+                
+                // Check if user has already played today
+                if (hasPlayedToday()) {
+                    document.getElementById('alreadyPlayedMessage').style.display = 'block';
+                    document.getElementById('nextPlayTime').textContent = formatTimeUntilNextPlay();
+                    return;
+                }
+                
+                const winCode = checkWin();
+                
+                if (winCode) {
+                    document.getElementById('winCode').textContent = winCode;
+                    document.getElementById('expiryDate').textContent = getEndOfWeekDate();
+                    document.getElementById('winMessage').style.display = 'block';
+                } else {
+                    document.getElementById('loseMessage').style.display = 'block';
+                }
+            });
+            
+            // Admin link click
+            adminLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('resultContainer').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+            });
+            
+            // Admin login
+            loginButton.addEventListener('click', function() {
+                const password = document.getElementById('adminPassword').value;
+                
+                // Simple password protection - in a real app, use proper authentication
+                if (password === 'coffee123') {
+                    document.getElementById('adminLogin').style.display = 'none';
+                    document.getElementById('adminDashboard').style.display = 'block';
+                    updateAdminDashboard();
+                } else {
+                    alert('Incorrect password');
+                }
+            });
+            
+            // Reset button click
+            resetButton.addEventListener('click', resetPromotion);
+            
+            // Back button click
+            backButton.addEventListener('click', function() {
+                document.getElementById('adminPanel').style.display = 'none';
+                document.getElementById('resultContainer').style.display = 'block';
+                document.getElementById('adminLogin').style.display = 'block';
+                document.getElementById('adminDashboard').style.display = 'none';
+                document.getElementById('adminPassword').value = '';
+                
+                // Reset the promotion view
+                document.getElementById('winMessage').style.display = 'none';
+                document.getElementById('loseMessage').style.display = 'none';
+                document.getElementById('alreadyPlayedMessage').style.display = 'none';
+                
+                // Show appropriate message based on whether user has played today
+                if (hasPlayedToday()) {
+                    document.getElementById('alreadyPlayedMessage').style.display = 'block';
+                    document.getElementById('nextPlayTime').textContent = formatTimeUntilNextPlay();
+                } else {
+                    document.getElementById('initial-message').style.display = 'block';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
